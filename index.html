@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Character Replacer</title>
+    <title>RA - Love Language</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <style>
         body {
@@ -31,14 +31,63 @@
     <div class="container text-center shadow-lg">
         <h2 class="mb-3">Our Love Language</h2>
         <textarea id="inputText" class="form-control mb-3" rows="8" placeholder="Type here..."></textarea>
-        <button class="btn btn-primary w-100" onclick="replaceText()">Replace</button>
-        <h4 class="mt-3">Output:</h4>
+        <p class="text-center">or</p>
+        <input type="file" id="file" accept="image/*" capture="environment" class="form-control mb-3">
+        <button class="btn btn-primary w-100 file-choose" onclick="replaceText()">Submit</button>
+        <h4 class="mt-3">Output</h4>
         <p id="outputText" class="border p-3 bg-light rounded"></p>
     </div>
 
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
     <script>
-        function replaceText() {
-            let input = document.getElementById("inputText").value;
+        async function replaceText() {
+            if ($('#file')[0].files.length > 0) {
+                $('.file-choose').attr('disabled', true);
+                $('.file-choose').text('Processing...');
+
+                try {
+                    let input = await get_text(); // Wait for OCR result
+                    replacer(input);
+                } catch (error) {
+                    console.error("Error processing image:", error);
+                }
+
+                $('.file-choose').attr('disabled', false);
+                $('.file-choose').text('Submit');
+            } else {
+                let input = document.getElementById("inputText").value;
+                replacer(input);
+            }
+        }
+
+        async function get_text() {
+            return new Promise((resolve, reject) => {
+                var formData = new FormData();
+                formData.append('image', $('#file')[0].files[0]);
+
+                $.ajax({
+                    method: 'POST',
+                    url: 'https://api.api-ninjas.com/v1/imagetotext',
+                    headers: {
+                        'X-Api-Key': 'ucgHqs0CHLBqUYCRedT3qA==T7WXHPcDWsdz0blo'
+                    },
+                    data: formData,
+                    enctype: 'multipart/form-data',
+                    processData: false,
+                    contentType: false,
+                    success: function (result) {
+                        let text = result.map(element => element.text).join(' ');
+                        resolve(text); // Resolve the promise with extracted text
+                    },
+                    error: function (jqXHR, textStatus, errorThrown) {
+                        alert(jqXHR.responseText);
+                        reject(new Error(jqXHR.responseText)); // Reject the promise on error
+                    }
+                });
+            });
+        }
+
+        function replacer(input) {
             let replacements = {};
             let alphabet = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ";
             let reverseAlphabet = "zyxwvutsrqponmlkjihgfedcbaZYXWVUTSRQPONMLKJIHGFEDCBA";
@@ -51,6 +100,8 @@
             let output = input.split('').map(char => replacements[char] || char).join('');
             document.getElementById("outputText").innerText = output;
         }
+
+
     </script>
 </body>
 
