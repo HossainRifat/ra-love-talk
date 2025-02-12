@@ -42,70 +42,104 @@
     <script>
         async function replaceText() {
             if ($('#file')[0].files.length > 0) {
-                $('.file-choose').attr('disabled', true);
-                $('.file-choose').text('Processing...');
-
+                $('.file-choose').attr('disabled', true).text('Processing...');
                 try {
-                    let input = await get_text(); // Wait for OCR result
+                    let input = await get_text();
                     replacer(input);
                 } catch (error) {
-                    console.error("Error processing image:", error);
+                    console.error("Error:", error);
+                    alert("Processing failed: " + error.message);
                 }
-
-                $('.file-choose').attr('disabled', false);
-                $('.file-choose').text('Submit');
+                $('.file-choose').attr('disabled', false).text('Submit');
             } else {
-                let input = document.getElementById("inputText").value;
-                replacer(input);
+                replacer(document.getElementById("inputText").value);
             }
         }
 
         async function get_text() {
-            return new Promise((resolve, reject) => {
-                var formData = new FormData();
-                formData.append('file', $('#file')[0].files[0]);
-                formData.append('apikey', 'cc97d2f58f88957'); // Free API Key for OCR.space
-                formData.append('language', 'eng');
-                formData.append('OCREngine', '2'); // Use Engine 2 for better accuracy
+            const file = $('#file')[0].files[0];
+            if (!file) return Promise.reject(new Error('No file selected'));
 
-                $.ajax({
-                    method: 'POST',
-                    url: 'https://api.ocr.space/parse/image',
-                    data: formData,
-                    processData: false,
-                    contentType: false,
-                    success: function (result) {
-                        console.log(result);
-                        if (result.ParsedResults && result.ParsedResults[0]) {
-                            let text = result.ParsedResults[0].ParsedText;
-                            resolve(text); // Resolve the promise with extracted text
-                        } else {
-                            reject(new Error('No text extracted'));
+            return new Promise(async (resolve, reject) => {
+                try {
+                    const compressedBlob = file.size > 1024 * 1024 ?
+                        await compressImage(file) : file;
+
+                    const formData = new FormData();
+                    formData.append('file', compressedBlob, file.name);
+                    formData.append('apikey', 'cc97d2f58f88957');
+                    formData.append('language', 'eng');
+                    formData.append('OCREngine', '2');
+
+                    $.ajax({
+                        method: 'POST',
+                        url: 'https://api.ocr.space/parse/image',
+                        data: formData,
+                        processData: false,
+                        contentType: false,
+                        success: (result) => {
+                            if (result?.ParsedResults?.[0]?.ParsedText) {
+                                resolve(result.ParsedResults[0].ParsedText);
+                            } else {
+                                reject(new Error('OCR failed: No text found'));
+                            }
+                        },
+                        error: (jqXHR) => reject(new Error(`OCR Error: ${jqXHR.responseText}`))
+                    });
+                } catch (error) {
+                    reject(error);
+                }
+            });
+        }
+
+        function compressImage(file, targetMB = 1, maxWidth = 2000, quality = 0.9) {
+            return new Promise((resolve, reject) => {
+                const img = new Image();
+                const reader = new FileReader();
+
+                reader.onload = (e) => {
+                    img.onload = () => {
+                        const canvas = document.createElement('canvas');
+                        let { width, height } = img;
+
+                        // Resize if larger than maxWidth
+                        if (width > maxWidth || height > maxWidth) {
+                            const ratio = Math.min(maxWidth / width, maxWidth / height);
+                            width = width * ratio;
+                            height = height * ratio;
                         }
-                    },
-                    error: function (jqXHR, textStatus, errorThrown) {
-                        alert(jqXHR.responseText);
-                        reject(new Error(jqXHR.responseText)); // Reject the promise on error
-                    }
-                });
+
+                        canvas.width = width;
+                        canvas.height = height;
+                        canvas.getContext('2d').drawImage(img, 0, 0, width, height);
+
+                        const process = (currentQuality) => {
+                            canvas.toBlob(blob => {
+                                if (blob.size <= targetMB * 1024 * 1024 || currentQuality <= 0.5) {
+                                    resolve(blob);
+                                } else {
+                                    process(currentQuality - 0.1);
+                                }
+                            }, 'image/jpeg', currentQuality);
+                        };
+
+                        process(quality);
+                    };
+                    img.onerror = () => reject(new Error('Failed to load image'));
+                    img.src = e.target.result;
+                };
+                reader.onerror = () => reject(new Error('Failed to read file'));
+                reader.readAsDataURL(file);
             });
         }
 
         function replacer(input) {
-            let replacements = {};
-            let alphabet = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ";
-            let reverseAlphabet = "zyxwvutsrqponmlkjihgfedcbaZYXWVUTSRQPONMLKJIHGFEDCBA";
-
-            for (let i = 0; i < alphabet.length; i++) {
-                replacements[alphabet[i]] = reverseAlphabet[i];
-            }
-            replacements[' '] = ' ';
-
-            let output = input.split('').map(char => replacements[char] || char).join('');
-            document.getElementById("outputText").innerText = output;
+            const alphabet = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ";
+            const reversed = "zyxwvutsrqponmlkjihgfedcbaZYXWVUTSRQPONMLKJIHGFEDCBA";
+            document.getElementById("outputText").innerText = input.replace(/[a-z]/gi,
+                c => reversed[alphabet.indexOf(c)]
+            );
         }
-
-
     </script>
 </body>
 
