@@ -164,10 +164,21 @@
         function replacer(input) {
             const alphabet = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ";
             const reversed = "zyxwvutsrqponmlkjihgfedcbaZYXWVUTSRQPONMLKJIHGFEDCBA";
-            document.getElementById("outputText").innerText = input.replace(/[a-z]/gi,
-                c => reversed[alphabet.indexOf(c)]
-            );
+
+            const bengaliAlphabet = "অআইঈউঊঋএঐওঔকখগঘঙচছজঝঞটঠডঢণতথদধনপফবভমযরলশষসহ";
+            const reversedBengali = "হসহষশলরযমভবফপনধদথতণঢডঠটঞঝজছচঙঘগখকঔওঐএঋঊউঈআইঅ";
+
+            document.getElementById("outputText").innerText = input.replace(/[a-zA-Zঅ-হ]/gi, c => {
+                let index = alphabet.indexOf(c);
+                if (index !== -1) return reversed[index];
+
+                index = bengaliAlphabet.indexOf(c);
+                if (index !== -1) return reversedBengali[index];
+
+                return c;
+            });
         }
+
     </script>
 </body>
 
